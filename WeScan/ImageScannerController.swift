@@ -57,12 +57,24 @@ public final class ImageScannerController: UINavigationController {
     }()
     
     public required init() {
-        let scannerViewController = ScannerViewController()
-        super.init(rootViewController: scannerViewController)
-        navigationBar.tintColor = .black
-        navigationBar.isTranslucent = false
+        super.init(rootViewController: ScannerViewController())
+        setup()
+    }
+    
+    public required init(image: UIImage) {
+        super.init(rootViewController: EditScanViewController(image: image, quad: nil, applyPortraitOrientation: false))
+        setup()
+    }
+    
+    private func setup() {
+        viewControllers[0].navigationItem.leftBarButtonItem = UIBarButtonItem(barButtonSystemItem: .cancel, target: self, action: #selector(cancelImageScannerController))
+        
         self.view.addSubview(blackFlashView)
         setupConstraints()
+    }
+    
+    @objc internal func cancelImageScannerController() {
+        imageScannerDelegate?.imageScannerControllerDidCancel(self)
     }
     
     public override init(nibName nibNameOrNil: String?, bundle nibBundleOrNil: Bundle?) {

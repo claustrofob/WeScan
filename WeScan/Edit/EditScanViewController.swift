@@ -50,8 +50,8 @@ final class EditScanViewController: UIViewController {
     
     // MARK: - Life Cycle
     
-    init(image: UIImage, quad: Quadrilateral?) {
-        self.image = image.applyingPortraitOrientation()
+    init(image: UIImage, quad: Quadrilateral?, applyPortraitOrientation:Bool = true) {
+        self.image = applyPortraitOrientation ? image.applyingPortraitOrientation() : image
         self.quad = quad ?? EditScanViewController.defaultQuad(forImage: image)
         super.init(nibName: nil, bundle: nil)
     }
@@ -67,6 +67,7 @@ final class EditScanViewController: UIViewController {
         setupConstraints()
         title = NSLocalizedString("wescan.edit.title", tableName: nil, bundle: Bundle(for: EditScanViewController.self), value: "Edit Scan", comment: "The title of the EditScanViewController")
         navigationItem.rightBarButtonItem = nextButton
+        navigationItem.backBarButtonItem = UIBarButtonItem(title: "", style: .plain, target: nil, action: nil)
         
         zoomGestureController = ZoomGestureController(image: image, quadView: quadView)
         
@@ -187,10 +188,13 @@ final class EditScanViewController: UIViewController {
     
     /// Generates a `Quadrilateral` object that's centered and one third of the size of the passed in image.
     private static func defaultQuad(forImage image: UIImage) -> Quadrilateral {
-        let topLeft = CGPoint(x: image.size.width / 3.0, y: image.size.height / 3.0)
-        let topRight = CGPoint(x: 2.0 * image.size.width / 3.0, y: image.size.height / 3.0)
-        let bottomRight = CGPoint(x: 2.0 * image.size.width / 3.0, y: 2.0 * image.size.height / 3.0)
-        let bottomLeft = CGPoint(x: image.size.width / 3.0, y: 2.0 * image.size.height / 3.0)
+        
+        let rate:CGFloat = 8.0
+        
+        let topLeft = CGPoint(x: image.size.width / rate, y: image.size.height / rate)
+        let topRight = CGPoint(x: image.size.width - image.size.width / rate, y: image.size.height / rate)
+        let bottomRight = CGPoint(x: image.size.width - image.size.width / rate, y: image.size.height - image.size.height / rate)
+        let bottomLeft = CGPoint(x: image.size.width / rate, y: image.size.height - image.size.height / rate)
         
         let quad = Quadrilateral(topLeft: topLeft, topRight: topRight, bottomRight: bottomRight, bottomLeft: bottomLeft)
         
