@@ -14,21 +14,25 @@ final class ReviewViewController: UIViewController {
     var enhancedImageIsAvailable = false
     var isCurrentlyDisplayingEnhancedImage = false
     
-    lazy private var imageView: UIImageView = {
-        let imageView = UIImageView()
-        imageView.clipsToBounds = true
-        imageView.isOpaque = true
+    lazy private var imageView: MarkupImageView = {
+        let imageView = MarkupImageView(frame: CGRect.zero)
         imageView.image = results.scannedImage
-        imageView.backgroundColor = .black
-        imageView.contentMode = .scaleAspectFit
-        imageView.translatesAutoresizingMaskIntoConstraints = false
+        imageView.delegate = self
         return imageView
     }()
     
     lazy private var enhanceButton: UIBarButtonItem = {
         let image = UIImage(named: "enhance", in: Bundle(for: ScannerViewController.self), compatibleWith: nil)
         let button = UIBarButtonItem(image: image, style: .plain, target: self, action: #selector(toggleEnhancedImage))
-        button.tintColor = .white
+        button.tintColor = .black
+        return button
+    }()
+    
+    lazy private var undoButton: UIBarButtonItem = {
+        let image = UIImage(named: "undo-icon", in: Bundle(for: ScannerViewController.self), compatibleWith: nil)?.withRenderingMode(.alwaysTemplate)
+        let button = UIBarButtonItem(image: image, style: .plain, target: self, action: #selector(tapUndoImage))
+        button.tintColor = .black
+        button.isEnabled = false
         return button
     }()
     
@@ -56,26 +60,35 @@ final class ReviewViewController: UIViewController {
 
         enhancedImageIsAvailable = results.enhancedImage != nil
         
+        view.backgroundColor = .black
+        
         setupViews()
         setupToolbar()
-        setupConstraints()
         
         title = NSLocalizedString("wescan.review.title", tableName: nil, bundle: Bundle(for: ReviewViewController.self), value: "Review", comment: "The review title of the ReviewController")
         navigationItem.rightBarButtonItem = doneButton
     }
     
+    func addUndoObservers() {
+        NotificationCenter.default.addObserver(self, selector: #selector(self.didUndoChange), name: NSNotification.Name.NSUndoManagerDidUndoChange, object: nil)
+    }
+    
+    @objc func didUndoChange() {
+        undoButton.isEnabled = undoManager?.canUndo ?? false
+    }
+    
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         
-        // We only show the toolbar (with the enhance button) if the enhanced image is available.
-        if enhancedImageIsAvailable {
-            navigationController?.setToolbarHidden(false, animated: true)
-        }
+        navigationController?.setToolbarHidden(false, animated: true)
+        addUndoObservers()
     }
     
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
         navigationController?.setToolbarHidden(true, animated: true)
+        
+        NotificationCenter.default.removeObserver(self)
     }
     
     // MARK: Setups
@@ -84,24 +97,25 @@ final class ReviewViewController: UIViewController {
         view.addSubview(imageView)
     }
     
-    private func setupToolbar() {
-        guard enhancedImageIsAvailable else { return }
+    override func viewWillLayoutSubviews() {
+        super.viewWillLayoutSubviews()
         
-        navigationController?.toolbar.barStyle = .blackTranslucent
-        
-        let fixedSpace = UIBarButtonItem(barButtonSystemItem: .fixedSpace, target: nil, action: nil)
-        toolbarItems = [fixedSpace, enhanceButton]
+        imageView.frame.size = imageView.sizeThatFits(view.frame.size)
+        imageView.center = view.center
     }
     
-    private func setupConstraints() {
-        let imageViewConstraints = [
-            imageView.topAnchor.constraint(equalTo: view.topAnchor),
-            imageView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            view.bottomAnchor.constraint(equalTo: imageView.bottomAnchor),
-            view.leadingAnchor.constraint(equalTo: imageView.leadingAnchor)
-        ]
+    private func setupToolbar() {
+        navigationController?.toolbar.isTranslucent = false
         
-        NSLayoutConstraint.activate(imageViewConstraints)
+        toolbarItems = []
+        
+        if enhancedImageIsAvailable {
+            toolbarItems!.append(enhanceButton)
+        }
+        
+        let flexibleSpace = UIBarButtonItem(barButtonSystemItem: .flexibleSpace, target: nil, action: nil)
+        toolbarItems!.append(flexibleSpace)
+        toolbarItems!.append(undoButton)
     }
     
     // MARK: - Actions
@@ -110,7 +124,7 @@ final class ReviewViewController: UIViewController {
         guard enhancedImageIsAvailable else { return }
         if isCurrentlyDisplayingEnhancedImage {
             imageView.image = results.scannedImage
-            enhanceButton.tintColor = .white
+            enhanceButton.tintColor = .black
         } else {
             imageView.image = results.enhancedImage
             enhanceButton.tintColor = UIColor(red: 64 / 255, green: 159 / 255, blue: 255 / 255, alpha: 1.0)
@@ -119,12 +133,22 @@ final class ReviewViewController: UIViewController {
         isCurrentlyDisplayingEnhancedImage.toggle()
     }
     
+    @objc func tapUndoImage() {
+        undoManager?.undo()
+    }
+    
     @objc private func finishScan() {
         guard let imageScannerController = navigationController as? ImageScannerController else { return }
         var newResults = results
+        newResults.markupImage = imageView.markupImage
         newResults.scannedImage = results.scannedImage
         newResults.doesUserPreferEnhancedImage = isCurrentlyDisplayingEnhancedImage
         imageScannerController.imageScannerDelegate?.imageScannerController(imageScannerController, didFinishScanningWithResults: newResults)
     }
+}
 
+extension ReviewViewController: MarkupImageViewDelegate {
+    func markupImageDidFinishLine() {
+        didUndoChange()
+    }
 }
