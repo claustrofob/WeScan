@@ -42,6 +42,10 @@ final class ReviewViewController: UIViewController {
         return button
     }()
     
+    var scrollView:UIScrollView {
+        return view as! UIScrollView
+    }
+    
     private let results: ImageScannerResults
     
     // MARK: - Life Cycle
@@ -60,6 +64,9 @@ final class ReviewViewController: UIViewController {
 
         enhancedImageIsAvailable = results.enhancedImage != nil
         
+        edgesForExtendedLayout = .all
+        extendedLayoutIncludesOpaqueBars = true
+        
         view.backgroundColor = .black
         
         setupViews()
@@ -67,6 +74,29 @@ final class ReviewViewController: UIViewController {
         
         title = NSLocalizedString("wescan.review.title", tableName: nil, bundle: Bundle(for: ReviewViewController.self), value: "Review", comment: "The review title of the ReviewController")
         navigationItem.rightBarButtonItem = doneButton
+    }
+    
+    override func loadView() {
+        let view = UIScrollView()
+        if #available(iOS 11.0, *) {
+            view.contentInsetAdjustmentBehavior = .always
+        } else {
+            // Fallback on earlier versions
+        }
+        view.showsVerticalScrollIndicator = false
+        view.showsHorizontalScrollIndicator = false
+        view.isScrollEnabled = false
+        view.delegate = self
+        self.view = view
+    }
+    
+    func updateMinZoomScaleForSize(_ size: CGSize) {
+        let widthScale = size.width / imageView.bounds.width
+        let heightScale = size.height / imageView.bounds.height
+        let minScale = min(widthScale, heightScale)
+        
+        scrollView.minimumZoomScale = minScale
+        scrollView.maximumZoomScale = imageView.originalScale
     }
     
     func addUndoObservers() {
@@ -97,11 +127,28 @@ final class ReviewViewController: UIViewController {
         view.addSubview(imageView)
     }
     
+    var didLayoutImage = false
+    
     override func viewWillLayoutSubviews() {
         super.viewWillLayoutSubviews()
         
-        imageView.frame.size = imageView.sizeThatFits(view.frame.size)
-        imageView.center = view.center
+        var insets = UIEdgeInsets.zero
+        if #available(iOS 11.0, *) {
+            insets = scrollView.adjustedContentInset
+            
+            if let toolbar = navigationController?.toolbar {
+                additionalSafeAreaInsets.bottom = scrollView.frame.height - toolbar.frame.origin.y
+            }
+        }
+        
+        if !didLayoutImage {
+            imageView.frame.size = imageView.sizeThatFits(view.frame.size)
+            imageView.center = CGPoint(x: scrollView.bounds.size.width / 2 - insets.left, y: scrollView.bounds.size.height / 2 - insets.top)
+            
+            didLayoutImage = true
+        }
+        
+        updateMinZoomScaleForSize(view.bounds.size)
     }
     
     private func setupToolbar() {
@@ -144,6 +191,12 @@ final class ReviewViewController: UIViewController {
         newResults.scannedImage = results.scannedImage
         newResults.doesUserPreferEnhancedImage = isCurrentlyDisplayingEnhancedImage
         imageScannerController.imageScannerDelegate?.imageScannerController(imageScannerController, didFinishScanningWithResults: newResults)
+    }
+}
+
+extension ReviewViewController: UIScrollViewDelegate {
+    func viewForZooming(in scrollView: UIScrollView) -> UIView? {
+        return imageView
     }
 }
 

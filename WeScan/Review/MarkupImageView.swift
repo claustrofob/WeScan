@@ -44,19 +44,21 @@ class MarkupImageView: UIImageView {
         setupGesture()
     }
     
-    override func layoutSublayers(of layer: CALayer) {
-        super.layoutSublayers(of: layer)
-        
-        markupLayer.frame = layer.bounds
-        
+    var originalScale:CGFloat {
         let scale:CGFloat
         if let image = image, bounds.width > 0 {
             scale = image.size.width / bounds.width
         } else {
             scale = UIScreen.main.scale
         }
+        return scale
+    }
+    
+    override func layoutSublayers(of layer: CALayer) {
+        super.layoutSublayers(of: layer)
         
-        markupLayer.contentsScale = scale
+        markupLayer.frame = layer.bounds
+        markupLayer.contentsScale = originalScale
     }
     
     func setupGesture() {
