@@ -62,7 +62,7 @@ public final class ImageScannerController: UINavigationController {
     }
     
     public required init(image: UIImage) {
-        super.init(rootViewController: EditScanViewController(image: image, quad: nil, applyPortraitOrientation: false))
+        super.init(rootViewController: EditScanViewController(image: image, quad: nil, imageScanned: false))
         setup()
     }
     
