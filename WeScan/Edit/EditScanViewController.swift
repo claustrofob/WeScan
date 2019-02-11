@@ -129,6 +129,8 @@ final class EditScanViewController: UIViewController {
     // MARK: - Actions
     
     @objc func pushReviewController() {
+        guard let imageScannerController = navigationController as? ImageScannerController else { return }
+        
         guard let quad = quadView.quad,
             let ciImage = CIImage(image: image) else {
                 if let imageScannerController = navigationController as? ImageScannerController {
@@ -166,11 +168,9 @@ final class EditScanViewController: UIViewController {
         }
         
         let finalImage = imageScanned ? uiImage.withFixedOrientation() : uiImage!
+        let results = ImageScannerResults(originalImage: image, scannedImage: finalImage, enhancedImage: enhancedImage, doesUserPreferEnhancedImage: false, detectedRectangle: scaledQuad)
         
-        let results = ImageScannerResults(originalImage: image, scannedImage: finalImage, enhancedImage: enhancedImage, doesUserPreferEnhancedImage: false, detectedRectangle: scaledQuad, markupImage: nil)
-        let reviewViewController = ReviewViewController(results: results)
-        
-        navigationController?.pushViewController(reviewViewController, animated: true)
+        imageScannerController.imageScannerDelegate?.imageScannerController(imageScannerController, didFinishScanningWithResults: results)
     }
 
     private func displayQuad() {
