@@ -70,20 +70,18 @@ class MarkupImageView: UIImageView {
     @objc func handlePan(g:UIPanGestureRecognizer) {
         switch g.state {
         case .began:
-            markupLayer.lines.append([])
+            let point = g.location(in: self)
+            markupLayer.start(point: point)
             fallthrough
         case .changed:
             let point = g.location(in: self)
-            markupLayer.lines[markupLayer.lines.count - 1].append(point)
+            markupLayer.add(point: point)
         default:
             undoManager?.registerUndo(withTarget: self) { target in
-                self.markupLayer.lines.removeLast()
-                self.markupLayer.setNeedsDisplay()
+                self.markupLayer.undoLastPath()
             }
             delegate?.markupImageDidFinishLine()
         }
-        
-        markupLayer.setNeedsDisplay()
     }
     
     override func sizeThatFits(_ size: CGSize) -> CGSize {
@@ -97,7 +95,7 @@ class MarkupImageView: UIImageView {
 
 class MarkupLayer: CALayer {
     
-    var lines:[[CGPoint]] = []
+    var lines:[UIBezierPath] = []
     
     var image:UIImage? {
         guard lines.count > 0 else { return nil }
@@ -106,7 +104,7 @@ class MarkupLayer: CALayer {
         format.scale = contentsScale
         let renderer = UIGraphicsImageRenderer(size: bounds.size, format: format)
         return renderer.image { ctx in
-            self.draw(in: ctx.cgContext)
+            self.render(in: ctx.cgContext)
         }
     }
     
@@ -114,31 +112,58 @@ class MarkupLayer: CALayer {
         super.init()
         
         masksToBounds = true
+        sublayers = []
+    }
+    
+    public func start(point: CGPoint) {
+        let path = UIBezierPath()
+        path.move(to: point)
+        lines.append(path)
+        
+        let shape = shapeLayer
+        addShape(shape: shape)
+    }
+    
+    public func add(point: CGPoint) {
+        let line = lines[lines.count - 1]
+        line.addQuadCurve(to: point, controlPoint: line.currentPoint)
+        
+        let layer = sublayers!.last as! CAShapeLayer
+        layer.path = line.cgPath
+    }
+    
+    public func undoLastPath() {
+        lines.removeLast()
+        sublayers?.removeLast()
     }
     
     required init?(coder aDecoder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }
     
-    override func draw(in ctx: CGContext) {
-        ctx.beginPath()
-        ctx.setStrokeColor(UIColor(red: 2/255, green: 190/255, blue: 216/255, alpha: 1).cgColor)
-        ctx.setLineCap(.round)
-        ctx.setLineJoin(.round)
-        ctx.setLineWidth(2)
+    override func layoutSublayers() {
+        super.layoutSublayers()
         
-        for line in lines {
-            guard line.count > 0 else { continue }
-            
-            ctx.move(to: line.first!)
-            
-            for (i, point) in line.enumerated() {
-                guard i != 0 else { continue }
-                ctx.addQuadCurve(to: point, control: line[i - 1])
+        if let sublayers = sublayers {
+            for layer in sublayers {
+                layer.frame = self.bounds
+                layer.contentsScale = contentsScale
             }
         }
-        
-        ctx.strokePath()
     }
     
+    var shapeLayer:CAShapeLayer {
+        let shape = CAShapeLayer()
+        shape.strokeColor = UIColor(red: 2/255, green: 190/255, blue: 216/255, alpha: 0.7).cgColor
+        shape.lineCap = .round
+        shape.lineJoin = .round
+        shape.lineWidth = 8
+        shape.fillColor = UIColor.clear.cgColor
+        return shape
+    }
+    
+    func addShape(shape:CAShapeLayer) {
+        shape.frame = bounds
+        addSublayer(shape)
+    }
 }
