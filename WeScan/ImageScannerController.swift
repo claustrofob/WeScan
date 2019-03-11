@@ -33,6 +33,10 @@ public protocol ImageScannerControllerDelegate: NSObjectProtocol {
     ///   - scanner: The scanner controller object managing the scanning interface.
     ///   - error: The error that occured.
     func imageScannerController(_ scanner: ImageScannerController, didFailWithError error: Error)
+    
+    func imageScannerControllerDidSetup(_ scanner: ImageScannerController)
+    func imageScannerControllerDidAppear(_ scanner: ImageScannerController)
+    func imageScannerControllerDidLayoutSubviews(_ scanner: ImageScannerController)
 }
 
 /// A view controller that manages the full flow for scanning documents.
@@ -56,13 +60,9 @@ public final class ImageScannerController: UINavigationController {
         return view
     }()
     
-    public required init() {
+    public required init(delegate: ImageScannerControllerDelegate?) {
         super.init(rootViewController: ScannerViewController())
-        setup()
-    }
-    
-    public required init(image: UIImage) {
-        super.init(rootViewController: EditScanViewController(image: image, quad: nil, imageScanned: false))
+        self.imageScannerDelegate = delegate
         setup()
     }
     
@@ -71,6 +71,8 @@ public final class ImageScannerController: UINavigationController {
         
         self.view.addSubview(blackFlashView)
         setupConstraints()
+        
+        imageScannerDelegate?.imageScannerControllerDidSetup(self)
     }
     
     @objc internal func cancelImageScannerController() {
@@ -109,6 +111,17 @@ public final class ImageScannerController: UINavigationController {
         }
     }
     
+    public override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        
+        imageScannerDelegate?.imageScannerControllerDidAppear(self)
+    }
+    
+    public override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        
+        imageScannerDelegate?.imageScannerControllerDidLayoutSubviews(self)
+    }
 }
 
 /// Data structure containing information about a scan.

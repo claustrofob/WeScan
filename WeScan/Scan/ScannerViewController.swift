@@ -8,6 +8,7 @@
 
 import UIKit
 import AVFoundation
+import Photos
 
 /// An enum used to know if the flashlight was toggled successfully.
 enum FlashResult {
@@ -24,9 +25,6 @@ final class ScannerViewController: UIViewController {
     /// The view that draws the detected rectangles.
     private let quadView = QuadrilateralView()
     
-    /// Whether flash is enabled
-    private var flashEnabled = false
-    
     lazy private var shutterButton: ShutterButton = {
         let button = ShutterButton()
         button.translatesAutoresizingMaskIntoConstraints = false
@@ -34,10 +32,29 @@ final class ScannerViewController: UIViewController {
         return button
     }()
     
-    lazy private var flashButton: UIBarButtonItem = {
-        let flashImage = UIImage(named: "flash", in: Bundle(for: ScannerViewController.self), compatibleWith: nil)
-        let flashButton = UIBarButtonItem(image: flashImage, style: .plain, target: self, action: #selector(toggleFlash))
-        return flashButton
+    lazy private var flashButton: UIButton = {
+        let flashImage = UIImage(named: "flash", in: Bundle(for: ScannerViewController.self), compatibleWith: nil)?.withRenderingMode(.alwaysTemplate)
+        let button = UIButton()
+        button.setImage(flashImage, for: .normal)
+        button.clipsToBounds = true
+        button.frame.size = CGSize(width: 40, height: 40)
+        button.layer.cornerRadius = 20
+        button.backgroundColor = .white
+        button.tintColor = .black
+        button.addTarget(self, action: #selector(toggleFlash), for: .touchUpInside)
+        return button
+    }()
+    
+    lazy private var libraryButton: UIButton = {
+        let button = UIButton()
+        button.clipsToBounds = true
+        button.frame.size = CGSize(width: 48, height: 48)
+        button.layer.cornerRadius = 3
+        button.layer.borderColor = UIColor.white.cgColor
+        button.layer.borderWidth = 2
+        button.backgroundColor = .black
+        button.addTarget(self, action: #selector(openLibrary), for: .touchUpInside)
+        return button
     }()
     
     lazy private var activityIndicator: UIActivityIndicatorView = {
@@ -76,6 +93,12 @@ final class ScannerViewController: UIViewController {
         super.viewDidLayoutSubviews()
         
         videoPreviewlayer.frame = view.layer.bounds
+        
+        flashButton.center = shutterButton.center
+        flashButton.frame.origin.x = view.bounds.maxX - 20 - flashButton.frame.width
+        
+        libraryButton.center = shutterButton.center
+        libraryButton.frame.origin.x = 20
     }
     
     override func viewWillDisappear(_ animated: Bool) {
@@ -99,16 +122,14 @@ final class ScannerViewController: UIViewController {
         view.addSubview(quadView)
         view.addSubview(shutterButton)
         view.addSubview(activityIndicator)
+        view.addSubview(flashButton)
+        view.addSubview(libraryButton)
+        
+        queryLastLibraryPhoto()
     }
     
     private func setupNavButtons() {
-        navigationItem.rightBarButtonItem = flashButton
-        
-        if UIImagePickerController.isFlashAvailable(for: .rear) == false {
-            let flashOffImage = UIImage(named: "flashUnavailable", in: Bundle(for: ScannerViewController.self), compatibleWith: nil)
-            flashButton.image = flashOffImage
-            flashButton.tintColor = UIColor.lightGray
-        }
+        flashButton.isHidden = !UIImagePickerController.isFlashAvailable(for: .rear)
     }
     
     private func setupConstraints() {
@@ -156,15 +177,24 @@ final class ScannerViewController: UIViewController {
     @objc private func toggleFlash() {
         guard UIImagePickerController.isFlashAvailable(for: .rear) else { return }
         
-        if flashEnabled == false && toggleTorch(toOn: true) == .successful {
-            flashEnabled = true
+        if !flashButton.isSelected && toggleTorch(toOn: true) == .successful {
+            flashButton.isSelected = true
             flashButton.tintColor = .yellow
         } else {
-            flashEnabled = false
+            flashButton.isSelected = false
             flashButton.tintColor = .black
             
             toggleTorch(toOn: false)
         }
+    }
+    
+    @objc func openLibrary() {
+        let imagePicker = UIImagePickerController()
+        imagePicker.allowsEditing = false
+        imagePicker.sourceType = .photoLibrary
+        imagePicker.delegate = self
+
+        self.present(imagePicker, animated: true, completion: nil)
     }
     
     @discardableResult func toggleTorch(toOn: Bool) -> FlashResult {
@@ -176,6 +206,37 @@ final class ScannerViewController: UIViewController {
         return .successful
     }
     
+    func queryLastLibraryPhoto() {
+        let fetchOptions = PHFetchOptions()
+        fetchOptions.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
+        fetchOptions.fetchLimit = 1
+        
+        let fetchResult = PHAsset.fetchAssets(with: PHAssetMediaType.image, options: fetchOptions)
+        if let asset = fetchResult.firstObject {
+            let manager = PHImageManager.default()
+            let targetSize = libraryButton.frame.size
+            
+            manager.requestImage(for: asset,
+                                         targetSize: targetSize,
+                                         contentMode: .aspectFill,
+                                         options: nil,
+                                         resultHandler: { image, info in
+
+                                            self.libraryButton.setImage(image, for: .normal)
+                      
+            })
+        }
+    }
+}
+
+extension ScannerViewController: UIImagePickerControllerDelegate, UINavigationControllerDelegate {
+    func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
+        guard let image = info[UIImagePickerController.InfoKey.originalImage] as? UIImage else { return }
+        picker.dismiss(animated: true) {
+            let editVC = EditScanViewController(image: image.realFixOrientation(), quad: nil, imageScanned: false)
+            self.navigationController?.pushViewController(editVC, animated: true)
+        }
+    }
 }
 
 extension ScannerViewController: RectangleDetectionDelegateProtocol {
