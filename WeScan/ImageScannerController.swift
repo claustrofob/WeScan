@@ -37,6 +37,7 @@ public protocol ImageScannerControllerDelegate: NSObjectProtocol {
     func imageScannerControllerDidSetup(_ scanner: ImageScannerController)
     func imageScannerControllerDidAppear(_ scanner: ImageScannerController)
     func imageScannerControllerDidLayoutSubviews(_ scanner: ImageScannerController)
+    func imageScannerControllerAllowScan(_ scanner: ImageScannerController) -> Bool
 }
 
 /// A view controller that manages the full flow for scanning documents.

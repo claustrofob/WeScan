@@ -125,7 +125,12 @@ final class ScannerViewController: UIViewController {
         view.addSubview(flashButton)
         view.addSubview(libraryButton)
         
-        queryLastLibraryPhoto()
+        let scale = UIScreen.main.scale
+        let targetSize = CGSize(width: libraryButton.frame.size.width * scale, height: libraryButton.frame.size.height * scale)
+        
+        DispatchQueue.global(qos: .userInitiated).async {
+            self.queryLastLibraryPhoto(size: targetSize)
+        }
     }
     
     private func setupNavButtons() {
@@ -169,6 +174,9 @@ final class ScannerViewController: UIViewController {
     // MARK: - Actions
     
     @objc private func captureImage(_ sender: UIButton) {
+        guard let imageScannerController = navigationController as? ImageScannerController else { return }
+        guard (imageScannerController.imageScannerDelegate?.imageScannerControllerAllowScan(imageScannerController) ?? true) else { return }
+        
         (navigationController as? ImageScannerController)?.flashToBlack()
         shutterButton.isUserInteractionEnabled = false
         captureSessionManager?.capturePhoto()
@@ -189,6 +197,9 @@ final class ScannerViewController: UIViewController {
     }
     
     @objc func openLibrary() {
+        guard let imageScannerController = navigationController as? ImageScannerController else { return }
+        guard (imageScannerController.imageScannerDelegate?.imageScannerControllerAllowScan(imageScannerController) ?? true) else { return }
+        
         let imagePicker = UIImagePickerController()
         imagePicker.allowsEditing = false
         imagePicker.sourceType = .photoLibrary
@@ -206,23 +217,21 @@ final class ScannerViewController: UIViewController {
         return .successful
     }
     
-    func queryLastLibraryPhoto() {
+    func queryLastLibraryPhoto(size: CGSize) {
         let fetchOptions = PHFetchOptions()
         fetchOptions.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
         fetchOptions.fetchLimit = 1
         
         let fetchResult = PHAsset.fetchAssets(with: PHAssetMediaType.image, options: fetchOptions)
         if let asset = fetchResult.firstObject {
-            let manager = PHImageManager.default()
-            let targetSize = libraryButton.frame.size
-            
-            manager.requestImage(for: asset,
-                                         targetSize: targetSize,
+            PHImageManager.default().requestImage(for: asset,
+                                         targetSize: size,
                                          contentMode: .aspectFill,
                                          options: nil,
                                          resultHandler: { image, info in
-
-                                            self.libraryButton.setImage(image, for: .normal)
+                                            DispatchQueue.main.async {
+                                                self.libraryButton.setImage(image, for: .normal)
+                                            }
                       
             })
         }
