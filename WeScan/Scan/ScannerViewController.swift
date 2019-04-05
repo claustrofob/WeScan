@@ -64,6 +64,16 @@ final class ScannerViewController: UIViewController {
         return activityIndicator
     }()
 
+    lazy var settingsButton:UIButton = {
+        let button = UIButton()
+        button.setTitle(NSLocalizedString("wescan.scanning.enable_camera", tableName: nil, bundle: Bundle(for: ScannerViewController.self), value: "Enable Camera Access", comment: ""), for: .normal)
+        button.setTitleColor(.white, for: .normal)
+        //button.titleLabel?.numberOfLines = 0
+        button.titleLabel?.font = UIFont.systemFont(ofSize: 16, weight: .bold)
+        button.addTarget(self, action: #selector(openSettings), for: .touchUpInside)
+        return button
+    }()
+    
     // MARK: - Life Cycle
 
     override func viewDidLoad() {
@@ -73,7 +83,6 @@ final class ScannerViewController: UIViewController {
         title = NSLocalizedString("wescan.scanning.title", tableName: nil, bundle: Bundle(for: ScannerViewController.self), value: "Scanning", comment: "The title of the ScannerViewController")
         
         setupViews()
-        setupNavButtons()
         setupConstraints()
         
         captureSessionManager = CaptureSessionManager(videoPreviewLayer: videoPreviewlayer)
@@ -82,11 +91,33 @@ final class ScannerViewController: UIViewController {
     
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
+        
+        toggleAvailableOptions()
+        
         CaptureSession.current.isEditing = false
         CaptureSession.current.autoScanEnabled = false
         quadView.removeQuadrilateral()
         captureSessionManager?.start()
         UIApplication.shared.isIdleTimerDisabled = true
+    }
+    
+    @objc func openSettings() {
+        guard let settingsUrl = URL(string: UIApplication.openSettingsURLString) else {
+            return
+        }
+        
+        if UIApplication.shared.canOpenURL(settingsUrl) {
+            UIApplication.shared.open(settingsUrl, completionHandler: nil)
+        }
+    }
+    
+    func toggleAvailableOptions() {
+        let isCameraEnabled = AVCaptureDevice.authorizationStatus(for: .video) ==  .authorized
+        
+        shutterButton.isHidden = !isCameraEnabled
+        videoPreviewlayer.isHidden = !isCameraEnabled
+        settingsButton.isHidden = isCameraEnabled
+        flashButton.isHidden = !UIImagePickerController.isFlashAvailable(for: .rear)
     }
     
     override func viewDidLayoutSubviews() {
@@ -99,6 +130,9 @@ final class ScannerViewController: UIViewController {
         
         libraryButton.center = shutterButton.center
         libraryButton.frame.origin.x = 20
+        
+        settingsButton.sizeToFit()
+        settingsButton.center = view.convert(view.center, from: view.superview!)
     }
     
     override func viewWillDisappear(_ animated: Bool) {
@@ -114,16 +148,18 @@ final class ScannerViewController: UIViewController {
     // MARK: - Setups
     
     private func setupViews() {
-        view.backgroundColor = .white
+        view.backgroundColor = .black
         
         view.layer.addSublayer(videoPreviewlayer)
+        view.addSubview(shutterButton)
+        
         quadView.translatesAutoresizingMaskIntoConstraints = false
         quadView.editable = false
         view.addSubview(quadView)
-        view.addSubview(shutterButton)
         view.addSubview(activityIndicator)
         view.addSubview(flashButton)
         view.addSubview(libraryButton)
+        view.addSubview(settingsButton)
         
         let scale = UIScreen.main.scale
         let targetSize = CGSize(width: libraryButton.frame.size.width * scale, height: libraryButton.frame.size.height * scale)
@@ -131,10 +167,6 @@ final class ScannerViewController: UIViewController {
         DispatchQueue.global(qos: .userInitiated).async {
             self.queryLastLibraryPhoto(size: targetSize)
         }
-    }
-    
-    private func setupNavButtons() {
-        flashButton.isHidden = !UIImagePickerController.isFlashAvailable(for: .rear)
     }
     
     private func setupConstraints() {

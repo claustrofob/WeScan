@@ -22,3 +22,5 @@
 "wescan.scanning.cancel" = "Cancel";
 "wescan.scanning.auto" = "Auto";
 "wescan.scanning.manual" = "Manual";
+
+"wescan.scanning.enable_camera" = "Enable camera access";
