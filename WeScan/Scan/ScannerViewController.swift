@@ -28,7 +28,7 @@ final class ScannerViewController: UIViewController {
     lazy private var shutterButton: ShutterButton = {
         let button = ShutterButton()
         button.translatesAutoresizingMaskIntoConstraints = false
-        button.addTarget(self, action: #selector(captureImage(_:)), for: .touchUpInside)
+        button.addTarget(self, action: #selector(captureImage), for: .touchUpInside)
         return button
     }()
     
@@ -151,13 +151,13 @@ final class ScannerViewController: UIViewController {
         view.backgroundColor = .black
         
         view.layer.addSublayer(videoPreviewlayer)
-        view.addSubview(shutterButton)
         
         quadView.translatesAutoresizingMaskIntoConstraints = false
         quadView.editable = false
         view.addSubview(quadView)
         view.addSubview(activityIndicator)
         view.addSubview(flashButton)
+        view.addSubview(shutterButton)
         view.addSubview(libraryButton)
         view.addSubview(settingsButton)
         
@@ -205,7 +205,7 @@ final class ScannerViewController: UIViewController {
     
     // MARK: - Actions
     
-    @objc private func captureImage(_ sender: UIButton) {
+    @objc private func captureImage() {
         guard let imageScannerController = navigationController as? ImageScannerController else { return }
         guard (imageScannerController.imageScannerDelegate?.imageScannerControllerAllowScan(imageScannerController) ?? true) else { return }
         
